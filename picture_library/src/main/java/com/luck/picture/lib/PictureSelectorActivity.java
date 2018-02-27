@@ -1,8 +1,11 @@
 package com.luck.picture.lib;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
@@ -370,17 +373,66 @@ public class PictureSelectorActivity extends PictureBaseActivity implements View
      * start to camera、preview、crop
      */
     public void startOpenCamera() {
-        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+        dispatchCaptureIntent();
+    }
+
+    public void dispatchCaptureIntent() {
+        Intent captureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+
+        try {// 尽可能调用系统相机
+            String cameraPackageName = getCameraPhoneAppInfo(this);
+            if (cameraPackageName == null) {
+                cameraPackageName = "com.android.camera";
+            }
+            final Intent intentCamera = getPackageManager()
+                    .getLaunchIntentForPackage(cameraPackageName);
+            if (intentCamera != null) {
+                captureIntent.setPackage(cameraPackageName);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (captureIntent.resolveActivity(getPackageManager()) != null) {
             int type = config.mimeType == PictureConfig.TYPE_ALL ? PictureConfig.TYPE_IMAGE : config.mimeType;
             File cameraFile = PictureFileUtils.createCameraFile(this,
                     type,
                     outputCameraPath, config.suffixType);
             cameraPath = cameraFile.getAbsolutePath();
             Uri imageUri = parUri(cameraFile);
-            cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
-            startActivityForResult(cameraIntent, PictureConfig.REQUEST_CAMERA);
+            captureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+            startActivityForResult(captureIntent, PictureConfig.REQUEST_CAMERA);
         }
+    }
+
+    private String getCameraPhoneAppInfo(Context context) {
+        try {
+            String strCamera = "";
+            List<PackageInfo> packages = context.getPackageManager()
+                    .getInstalledPackages(0);
+            for (int i = 0; i < packages.size(); i++) {
+                try {
+                    PackageInfo packageInfo = packages.get(i);
+                    String strLabel = packageInfo.applicationInfo.loadLabel(
+                            context.getPackageManager()).toString();
+                    // 一般手机系统中拍照软件的名字
+                    if ("相机,照相机,照相,拍照,摄像,Camera,camera".contains(strLabel)) {
+                        strCamera = packageInfo.packageName;
+                        if ((packageInfo.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0) {
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            if (strCamera != null) {
+                return strCamera;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**
