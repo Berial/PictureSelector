@@ -23,7 +23,6 @@
         <activity
             android:name=".PictureVideoPlayActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
-            android:screenOrientation="sensor"
             android:theme="@style/activity.Theme" />
         <activity
             android:name=".PictureExternalPreviewActivity"
